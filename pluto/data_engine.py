@@ -7,7 +7,6 @@ import math
 import uuid
 from tqdm import tqdm
 from dataclasses import dataclass
-from .posthog.events import capture_event
 from .prompts import SAMPLE_GENERATION_PROMPT
 from .topic_tree import TopicTree
 from .dataset import Dataset
@@ -26,7 +25,6 @@ class DataEngine:
 
     def create_data(self, model_name: str, num_steps: int = None, num_example_demonstrations: int = 3, batch_size: int = 10, topic_tree : TopicTree = None):
         creation_id = uuid.uuid4()
-        capture_event("create-data", dict(model_name=model_name, num_steps=num_steps, num_example_demonstrations=num_example_demonstrations, batch_size=batch_size, topic_tree_exists=(topic_tree is not None), creation_id=creation_id))
         data_creation_prompt = SAMPLE_GENERATION_PROMPT
 
         if self.args.example_data is None:
@@ -92,7 +90,6 @@ class DataEngine:
                     if j == 2:
                         raise Exception(f"{j} consecutive errors generating training examples. Something's probably wrong.")
 
-        capture_event("create-data-finished", dict(creation_id=creation_id))
         return self.dataset
 
 
