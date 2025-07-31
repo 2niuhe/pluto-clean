@@ -9,7 +9,7 @@ class Dataset:
     @classmethod
     def from_jsonl(cls, file_path):
         instance = cls()
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             for line in f:
                 sample = json.loads(line)
                 assert cls.validate_sample(sample)
@@ -21,13 +21,13 @@ class Dataset:
     def from_list(cls, sample_list: List[Dict]):
         instance = cls()
         for sample in sample_list:
-            assert self.validate_sample(sample)
+            assert cls.validate_sample(sample)
             instance.samples.append(sample)
 
         return instance
 
     @classmethod
-    def validate_sample(self, sample: Dict):
+    def validate_sample(cls, sample: Dict):
         if 'messages' not in sample:
             return False
         for message in sample['messages']:
@@ -38,15 +38,15 @@ class Dataset:
         return True
 
     def save(self, save_path):
-        with open(save_path, "w") as f:
+        with open(save_path, "w", encoding='utf-8') as f:
             for sample in self.samples:
-                f.write(remove_linebreaks_and_spaces(json.dumps(sample))+"\n")
+                f.write(remove_linebreaks_and_spaces(json.dumps(sample, ensure_ascii=False))+"\n")
         
         print(f"saved dataset to {save_path}. You can now upload and fine-tune models on multiple platforms:\n\nHaven: https://app.haven.run/\nOpenAI: https://platform.openai.com/finetune")
     
     def add_samples(self, samples: List[Dict]):
         for sample in samples:
-            if self.validate_sample(sample):
+            if self.__class__.validate_sample(sample):
                 self.samples.append(sample)
             else:
                 print("Invalid sample, not added:", sample)

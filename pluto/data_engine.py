@@ -1,5 +1,5 @@
 import litellm
-from typing import List, Dict
+from typing import List, Dict, Optional
 from tqdm import tqdm
 import random
 import json
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from .prompts import SAMPLE_GENERATION_PROMPT
 from .topic_tree import TopicTree
 from .dataset import Dataset
+from .types import APIProvider
 
 @dataclass
 class EngineArguments:
@@ -23,9 +24,15 @@ class DataEngine:
         self.args = args
         self.dataset = Dataset()
 
-    def create_data(self, model_name: str, num_steps: int = None, num_example_demonstrations: int = 3, batch_size: int = 10, topic_tree : TopicTree = None):
+    def create_data(self, model_name: str, num_steps: int = None, num_example_demonstrations: int = 3, batch_size: int = 10, topic_tree: TopicTree = None, 
+                   api_provider: APIProvider = APIProvider.DEFAULT, api_base: Optional[str] = None, api_key: Optional[str] = None):
         creation_id = uuid.uuid4()
         data_creation_prompt = SAMPLE_GENERATION_PROMPT
+
+        # 根据 API 提供商配置模型名称和参数
+        final_model_name, final_api_base, final_api_key = self._configure_api_provider(
+            model_name, api_provider, api_base, api_key
+        )
 
         if self.args.example_data is None:
             num_example_demonstrations = None
@@ -67,13 +74,25 @@ class DataEngine:
             
             for j in range(3):
                 try:
-                    responses = litellm.batch_completion(
-                        model=model_name,
-                        messages=[[{"role": "user", "content": p}] for p in prompts],
-                        temperature=1.0,
-                        response_format={"type": "json_object"},
-                        max_retries=10
-                    )
+                    # 使用统一的配置调用 litellm
+                    completion_params = {
+                        "model": final_model_name,
+                        "messages": [[{"role": "user", "content": p}] for p in prompts],
+                        "temperature": 1.0,
+                        "max_retries": 10
+                    }
+                    
+                    # 根据 API 提供商添加特定参数
+                    if final_api_base:
+                        completion_params["api_base"] = final_api_base
+                    if final_api_key:
+                        completion_params["api_key"] = final_api_key
+                    
+                    # 某些提供商可能不支持 response_format
+                    if api_provider not in [APIProvider.OLLAMA]:
+                        completion_params["response_format"] = {"type": "json_object"}
+                    
+                    responses = litellm.batch_completion(**completion_params)
                     
                     samples = [json.loads(r.choices[0].message.content) for r in responses]
                     for sample in samples:
@@ -140,5 +159,45 @@ class DataEngine:
         else:
             return f"\nLastly, the topic of the training data should be related to the following subtopics: {' -> '.join(subtopic_list)}"
 
+    def _configure_api_provider(self, model_name: str, api_provider: APIProvider, api_base: Optional[str], api_key: Optional[str]):
+        """根据 API 提供商配置模型名称和参数"""
+        
+        if api_provider == APIProvider.OLLAMA:
+            # Ollama 配置
+            final_model_name = f"ollama/{model_name}"
+            final_api_base = api_base or "http://localhost:11434"
+            final_api_key = api_key  # Ollama 通常不需要 API key
+            
+        elif api_provider == APIProvider.OPENAI_COMPATIBLE:
+            # 自定义 base URL 的 OpenAI 兼容接口
+            final_model_name = f"openai/{model_name}"
+            final_api_base = api_base
+            final_api_key = api_key
+            
+            if not final_api_base:
+                raise ValueError("api_base is required for OpenAI compatible provider")
+            if not final_api_key:
+                raise ValueError("api_key is required for OpenAI compatible provider")
+                
+        elif api_provider == APIProvider.OPENROUTER:
+            # OpenRouter 配置
+            final_model_name = f"openrouter/{model_name}"
+            final_api_base = api_base or "https://openrouter.ai/api/v1"
+            final_api_key = api_key
+            
+            if not final_api_key:
+                # 尝试从环境变量获取
+                import os
+                final_api_key = os.getenv("OPENROUTER_API_KEY")
+                if not final_api_key:
+                    raise ValueError("api_key or OPENROUTER_API_KEY environment variable is required for OpenRouter provider")
+        
+        else:  # APIProvider.DEFAULT
+            # 默认配置（OpenAI/Azure 等）
+            final_model_name = model_name
+            final_api_base = api_base
+            final_api_key = api_key
+            
+        return final_model_name, final_api_base, final_api_key
 
 
