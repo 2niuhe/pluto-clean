@@ -2,7 +2,7 @@ import litellm
 import json
 from dataclasses import dataclass
 import os
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from .utils import extract_list
 from .prompts import TREE_GENERATION_PROMPT
 from .types import APIProvider
@@ -11,7 +11,7 @@ from .types import APIProvider
 @dataclass
 class TopicTreeArguments:
     root_prompt: str
-    model_system_prompt: str = None
+    model_system_prompt: Optional[str] = None
     tree_degree: int = 10
     tree_depth: int = 3
     # API 提供商配置
@@ -23,9 +23,9 @@ class TopicTreeArguments:
 class TopicTree:
     def __init__(self, args: TopicTreeArguments):
         self.args = args
-        self.tree_paths = []
+        self.tree_paths: List[List[str]] = []
 
-    def build_tree(self, model_name: str = "gpt-3.5-turbo-1106"):
+    def build_tree(self, model_name: str = "gpt-3.5-turbo-1106") -> None:
         self.tree_paths = self.build_subtree(
             model_name,
             [self.args.root_prompt],
@@ -38,10 +38,10 @@ class TopicTree:
         self,
         model_name: str,
         node_path: List[str],
-        system_prompt: str,
+        system_prompt: Optional[str],
         tree_degree: int,
         subtree_depth: int,
-    ):
+    ) -> List[List[str]]:
         print(f"building subtree for path: {' -> '.join(node_path)}")
         if subtree_depth == 0:
             return [node_path]
@@ -65,14 +65,14 @@ class TopicTree:
 
     def get_subtopics(
         self,
-        system_prompt: str,
+        system_prompt: Optional[str],
         node_path: List[str],
         num_subtopics: int,
         model_name: str,
-    ):
+    ) -> List[str]:
         prompt = TREE_GENERATION_PROMPT
 
-        prompt = prompt.replace("{{{{system_prompt}}}}", system_prompt)
+        prompt = prompt.replace("{{{{system_prompt}}}}", system_prompt or "")
         prompt = prompt.replace("{{{{subtopics_list}}}}", " -> ".join(node_path))
         prompt = prompt.replace("{{{{num_subtopics}}}}", str(num_subtopics))
 
@@ -96,9 +96,10 @@ class TopicTree:
 
         response = litellm.completion(**completion_params)
 
-        return extract_list(response.choices[0].message.content)
+        result = extract_list(response.choices[0].message.content)
+        return result if result is not None else []
 
-    def save(self, save_path: str):
+    def save(self, save_path: str) -> None:
         with open(save_path, "w", encoding="utf-8") as f:
             for path in self.tree_paths:
                 f.write(json.dumps(dict(path=path), ensure_ascii=False) + "\n")
@@ -109,8 +110,12 @@ class TopicTree:
         api_provider: APIProvider,
         api_base: Optional[str],
         api_key: Optional[str],
-    ):
+    ) -> Tuple[str, Optional[str], Optional[str]]:
         """根据 API 提供商配置模型名称和参数"""
+        
+        final_model_name: str
+        final_api_base: Optional[str]
+        final_api_key: Optional[str]
 
         if api_provider == APIProvider.OLLAMA:
             # Ollama 配置
@@ -121,13 +126,12 @@ class TopicTree:
         elif api_provider == APIProvider.OPENAI_COMPATIBLE:
             # 自定义 base URL 的 OpenAI 兼容接口
             final_model_name = f"openai/{model_name}"
+            if not api_base:
+                raise ValueError("api_base is required for OpenAI compatible provider")
+            if not api_key:
+                raise ValueError("api_key is required for OpenAI compatible provider")
             final_api_base = api_base
             final_api_key = api_key
-
-            if not final_api_base:
-                raise ValueError("api_base is required for OpenAI compatible provider")
-            if not final_api_key:
-                raise ValueError("api_key is required for OpenAI compatible provider")
 
         elif api_provider == APIProvider.OPENROUTER:
             # OpenRouter 配置

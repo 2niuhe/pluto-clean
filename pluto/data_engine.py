@@ -1,5 +1,5 @@
 import litellm
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from tqdm import tqdm
 import random
 import json
@@ -15,7 +15,7 @@ from .types import APIProvider
 class EngineArguments:
     instructions: str
     system_prompt: str
-    example_data: Dataset = None
+    example_data: Optional[Dataset] = None
 
 
 class DataEngine:
@@ -26,14 +26,14 @@ class DataEngine:
     def create_data(
         self,
         model_name: str,
-        num_steps: int = None,
+        num_steps: Optional[int] = None,
         num_example_demonstrations: int = 3,
         batch_size: int = 10,
-        topic_tree: TopicTree = None,
+        topic_tree: Optional[TopicTree] = None,
         api_provider: APIProvider = APIProvider.DEFAULT,
         api_base: Optional[str] = None,
         api_key: Optional[str] = None,
-    ):
+    ) -> Dataset:
         data_creation_prompt = SAMPLE_GENERATION_PROMPT
 
         # 根据 API 提供商配置模型名称和参数
@@ -42,7 +42,7 @@ class DataEngine:
         )
 
         if self.args.example_data is None:
-            num_example_demonstrations = None
+            num_example_demonstrations = 0
 
         if num_steps is None:
             raise Exception("no number of steps was specified")
@@ -84,24 +84,15 @@ class DataEngine:
             for j in range(3):
                 try:
                     # 使用统一的配置调用 litellm
-                    completion_params = {
-                        "model": final_model_name,
-                        "messages": [[{"role": "user", "content": p}] for p in prompts],
-                        "temperature": 1.0,
-                        "max_retries": 10,
-                    }
-
-                    # 根据 API 提供商添加特定参数
-                    if final_api_base:
-                        completion_params["api_base"] = final_api_base
-                    if final_api_key:
-                        completion_params["api_key"] = final_api_key
-
-                    # 某些提供商可能不支持 response_format
-                    if api_provider not in [APIProvider.OLLAMA]:
-                        completion_params["response_format"] = {"type": "json_object"}
-
-                    responses = litellm.batch_completion(**completion_params)
+                    responses = litellm.batch_completion(
+                        model=final_model_name,
+                        messages=[[{"role": "user", "content": p}] for p in prompts],
+                        temperature=1.0,
+                        max_retries=10,
+                        api_base=final_api_base,
+                        api_key=final_api_key,
+                        response_format={"type": "json_object"} if api_provider not in [APIProvider.OLLAMA] else None
+                    )
 
                     samples = [
                         json.loads(r.choices[0].message.content) for r in responses
@@ -132,8 +123,8 @@ class DataEngine:
         data_creation_prompt: str,
         model_name: str,
         num_example_demonstrations: int,
-        subtopics_list: List[List[str]] = None,
-    ):
+        subtopics_list: Optional[List[str]] = None,
+    ) -> str:
         prompt = data_creation_prompt.replace(
             "{{{{system_prompt}}}}", self.build_system_prompt()
         )
@@ -149,7 +140,7 @@ class DataEngine:
 
         return prompt
 
-    def save_dataset(self, save_path):
+    def save_dataset(self, save_path: str) -> None:
         self.dataset.save(save_path)
 
     def build_custom_instructions_text(self) -> str:
@@ -158,16 +149,16 @@ class DataEngine:
         else:
             return f"\nHere are additional instructions:\n<instructions>\n{self.args.instructions}\n</instructions>\n"
 
-    def build_system_prompt(self):
+    def build_system_prompt(self) -> str:
         return self.args.system_prompt
 
-    def build_examples_text(self, num_example_demonstrations: int):
+    def build_examples_text(self, num_example_demonstrations: int) -> str:
         if self.args.example_data is None:
             return ""
 
         else:
             examples_text = ""
-            if num_example_demonstrations != 0:
+            if num_example_demonstrations > 0:
                 examples_text += "Here are output examples:\n\n"
                 examples = random.sample(
                     self.args.example_data.samples, num_example_demonstrations
@@ -178,7 +169,7 @@ class DataEngine:
 
             return f"\nHere are output examples:\n<examples>\n{examples_text}\n</examples>\n"
 
-    def build_subtopics_text(self, subtopic_list: List[str]):
+    def build_subtopics_text(self, subtopic_list: Optional[List[str]]) -> str:
         if subtopic_list is None:
             return ""
         else:
@@ -190,8 +181,12 @@ class DataEngine:
         api_provider: APIProvider,
         api_base: Optional[str],
         api_key: Optional[str],
-    ):
+    ) -> Tuple[str, Optional[str], Optional[str]]:
         """根据 API 提供商配置模型名称和参数"""
+        
+        final_model_name: str
+        final_api_base: Optional[str]
+        final_api_key: Optional[str]
 
         if api_provider == APIProvider.OLLAMA:
             # Ollama 配置
@@ -202,13 +197,13 @@ class DataEngine:
         elif api_provider == APIProvider.OPENAI_COMPATIBLE:
             # 自定义 base URL 的 OpenAI 兼容接口
             final_model_name = f"openai/{model_name}"
+            
+            if not api_base:
+                raise ValueError("api_base is required for OpenAI compatible provider")
+            if not api_key:
+                raise ValueError("api_key is required for OpenAI compatible provider")
             final_api_base = api_base
             final_api_key = api_key
-
-            if not final_api_base:
-                raise ValueError("api_base is required for OpenAI compatible provider")
-            if not final_api_key:
-                raise ValueError("api_key is required for OpenAI compatible provider")
 
         elif api_provider == APIProvider.OPENROUTER:
             # OpenRouter 配置

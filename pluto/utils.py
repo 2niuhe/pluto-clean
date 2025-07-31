@@ -1,8 +1,9 @@
 import ast
 import re
+from typing import Optional, List, Any
 
 
-def extract_list(input_string):
+def extract_list(input_string: str) -> Optional[List[Any]]:
     # Find the start of the list
     start = input_string.find("[")
     if start == -1:
@@ -26,11 +27,11 @@ def extract_list(input_string):
     return found_list
 
 
-def replace_linebreaks(input_string):
+def replace_linebreaks(input_string: str) -> str:
     return input_string.replace("\n", "\\n")
 
 
-def remove_linebreaks_and_spaces(input_string):
+def remove_linebreaks_and_spaces(input_string: str) -> str:
     # Remove line breaks
     no_linebreaks = re.sub(r"\s+", " ", input_string)
 
