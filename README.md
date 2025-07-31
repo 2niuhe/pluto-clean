@@ -1,125 +1,181 @@
-<div align="center">
-    <h3 align="center">🌌 Pluto: Generate Synthetic Data for LLM Fine-Tuning 🌌</h3><p></p>
-    <img align="center" src="https://raw.githubusercontent.com/havenhq/pluto/main/images/pluto.png" height="300" alt="Oak" />
-</div>
+# 🌌 Pluto-Clean: Synthetic Data Generation for LLM Fine-Tuning
 
-<div align="center">
+A lightweight library for generating high-quality synthetic datasets for LLM fine-tuning with multi-provider API support.
 
+## Features
 
-<br>
-<br>
+- **Multi-Provider Support**: Works with OpenAI, Ollama, OpenRouter, and any OpenAI-compatible API
+- **Topic Trees**: Generate diverse data using hierarchical topic structures to avoid repetitiveness  
+- **Parallel Processing**: Speed up data generation with concurrent API requests
+- **Simple API**: Clean and intuitive interface for quick data generation
 
-[🌐 Website](https://haven.run/)
-<span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-[💬 Discord](https://discord.gg/JDjbfp6q2G)
-<br>
+## Installation
 
-</div>
-
-
-## Welcome 💜
-
-Welcome! We're the team behind [Haven](https://haven.run/), a platform for fine-tuning LLMs. We realized that many of our users lack datasets for fine-tuning LLMs, which is why we built Pluto, a library for synthetic data generation with LLMs. Here's what you can do with it:
-
-- Overcome repetitiveness and make your data highly diverse using topic trees
-- Run multiple sampling requests in parallel to speed up data generation
-- Use any model provider to generate data
-
-<br>
-
-## Quickstart 🚀
-
-To get started, let's use GPT-4 to generate a dataset of coding questions about numpy. First install the pluto library:
-
-```
-pip install pluto-data
+```bash
+pip install pluto-clean
 ```
 
-Make sure that you've set your OpenAI API Key as an environment variable:
-```
-export OPENAI_API_KEY=<your-key>
-``` 
-Then run the following code:
+## Quick Start
+
+### Basic Usage with OpenAI
 
 ```python
-from pluto import EngineArguments, DataEngine, Dataset, TopicTree, TopicTreeArguments
+from pluto import DataEngine, EngineArguments, APIProvider
 
-system_prompt = "You are a helpful AI coding assistant. You do not just give high level coding advice, but instead, you respond to coding questions with specific code examples."
+# Set your OpenAI API key
+export OPENAI_API_KEY=your-key
 
-tree = TopicTree(
-    args=TopicTreeArguments(
-        root_prompt="Functionalities of numpy",
-        model_system_prompt=system_prompt,
-        tree_degree=10,
-        tree_depth=2
-    )
+# Create data engine
+args = EngineArguments(
+    instructions="Generate coding questions and answers about Python",
+    system_prompt="You are a helpful programming tutor."
 )
 
-tree.build_tree(model_name="gpt-3.5-turbo-1106")
-tree.save("numpy_topictree.jsonl")
+engine = DataEngine(args)
 
-engine = DataEngine(
-    args=EngineArguments(
-        instructions="Please specifically provide training examples with questions about numpy. A training sample should consist of just one question and a response, and not a chat with multiple messages.",
-        system_prompt=system_prompt,
-        # example_data = Dataset.from_jsonl("example_data.jsonl") | OPTIONAL: comment out this argument to provide examples for the model generating training data
-
-    )
-)
-
+# Generate dataset
 dataset = engine.create_data(
-    model_name="gpt-4-1106-preview",
+    model_name="gpt-4",
+    num_steps=10,
+    batch_size=5
+)
+
+dataset.save("python_qa.jsonl")
+```
+
+### Using Topic Trees for Diverse Data
+
+```python
+from pluto import TopicTree, TopicTreeArguments, DataEngine, EngineArguments
+
+# Create topic tree
+tree_args = TopicTreeArguments(
+    root_prompt="Python programming concepts",
+    tree_degree=5,  # 5 subtopics per level
+    tree_depth=2    # 2 levels deep
+)
+
+tree = TopicTree(tree_args)
+tree.build_tree("gpt-3.5-turbo")
+
+# Generate data using the topic tree
+engine_args = EngineArguments(
+    instructions="Generate Python programming questions with code examples",
+    system_prompt="You are an expert Python developer and teacher."
+)
+
+engine = DataEngine(engine_args)
+dataset = engine.create_data(
+    model_name="gpt-4",
     num_steps=20,
     batch_size=5,
     topic_tree=tree
 )
 
-dataset.save("output_with_topictree.jsonl")
+dataset.save("diverse_python_qa.jsonl")
 ```
 
+## Multi-Provider Support
 
-<br>
+### Ollama (Local Models)
 
+```python
+from pluto import APIProvider
 
-### What happened in this example? 🤔
-
-In the example above, we did the following things:
-
-**Generate Topic Tree:**
-We first used GPT-3.5 to generate a "topic tree" with the root "Functionalities of numpy". A topic tree is simply a tree in which each child of a node needs to be a subtopic of its parent node and allows us to generate a list of aspects that should be covered in our training dataset. This is what paths from root to leaves within a topic tree look like (you can also find a full file [here](https://github.com/havenhq/pluto/blob/main/data/numpy_topictree.jsonl)):
-
-```
-Functionalities of numpy -> array manipulation -> slicing and indexing
-Functionalities of numpy -> matrix operations -> matrix factorization
-Functionalities of numpy -> statistical functions -> mean
-Functionalities of numpy -> signal processing -> time-frequency analysis
+dataset = engine.create_data(
+    model_name="llama3.1",
+    num_steps=10,
+    api_provider=APIProvider.OLLAMA,
+    api_base="http://localhost:11434"  # optional, defaults to localhost:11434
+)
 ```
 
-<br>
+### OpenRouter
 
+```python
+# Set environment variable
+export OPENROUTER_API_KEY=your-key
 
-**Generate Data from Topic Tree:**
-After generating our topic tree, we feed it into the `create_data` function of the `DataEngine`to ensure that our dataset touches upon a broad range of subjects and is not repetitive. Concretely, in this function, we iterate over all root-to-leaf paths in our topic tree and tell GPT-4 Turbo, which we use to generate our training data, to take the corresponding (sub)topic into account in its generated training sample. The parameter `batch_size=5` controls how many OpenAI requests we send simultaneously.
+dataset = engine.create_data(
+    model_name="anthropic/claude-3.5-sonnet",
+    num_steps=10,
+    api_provider=APIProvider.OPENROUTER
+)
+```
 
-We also provide the option to provide examples of how your dataset should look like to the `DataEngine`. To do this, simply add `example_data=Dataset.from_jsonl('your_data.jsonl')` as an argument to `DataEngine`. Just Three or four samples are totally sufficient for your example datasets and help a lot.
+### Custom OpenAI-Compatible APIs
 
+```python
+dataset = engine.create_data(
+    model_name="custom-model",
+    num_steps=10,
+    api_provider=APIProvider.OPENAI_COMPATIBLE,
+    api_base="http://your-server.com/v1",
+    api_key="your-api-key"
+)
+```
 
-<br>
+## API Reference
 
+### Core Classes
 
+#### `DataEngine(args: EngineArguments)`
+Main class for data generation.
 
-## Fine-Tune LLMs with your generated Datasets ⚙️
+**Methods:**
+- `create_data(model_name, num_steps, batch_size=10, topic_tree=None, api_provider=APIProvider.DEFAULT, api_base=None, api_key=None)` - Generate synthetic data
 
-Datasets generated with pluto are saved in a `jsonl` format:
+#### `EngineArguments`
+Configuration for data generation.
+
+**Parameters:**
+- `instructions: str` - Instructions for the model on what type of data to generate
+- `system_prompt: str` - System prompt for the model
+- `example_data: Dataset = None` - Optional example data to guide generation
+
+#### `TopicTree(args: TopicTreeArguments)`  
+Creates hierarchical topic structures for diverse data generation.
+
+**Methods:**
+- `build_tree(model_name)` - Build the topic tree using specified model
+- `save(filename)` - Save topic tree to JSONL file
+
+#### `TopicTreeArguments`
+Configuration for topic tree generation.
+
+**Parameters:**
+- `root_prompt: str` - Root topic prompt
+- `tree_degree: int = 10` - Number of subtopics per node
+- `tree_depth: int = 3` - Depth of the tree
+- `api_provider: APIProvider = APIProvider.DEFAULT` - API provider for tree generation
+- `api_base: str = None` - Custom API base URL
+- `api_key: str = None` - API key
+
+#### `APIProvider` (Enum)
+- `DEFAULT` - OpenAI, Azure OpenAI, etc.
+- `OLLAMA` - Local Ollama models  
+- `OPENAI_COMPATIBLE` - Custom OpenAI-compatible APIs
+- `OPENROUTER` - OpenRouter platform
+
+### Dataset Format
+
+Generated datasets use OpenAI's chat format:
 
 ```json
-{"messages": [{"role": "system", "content": "Marv is a factual chatbot that is also sarcastic."}, {"role": "user", "content": "What's the capital of France?"}, {"role": "assistant", "content": "Paris, as if everyone doesn't know that already."}]}
-{"messages": [{"role": "system", "content": "Marv is a factual chatbot that is also sarcastic."}, {"role": "user", "content": "Who wrote 'Romeo and Juliet'?"}, {"role": "assistant", "content": "Oh, just some guy named William Shakespeare. Ever heard of him?"}]}
-{"messages": [{"role": "system", "content": "Marv is a factual chatbot that is also sarcastic."}, {"role": "user", "content": "How far is the Moon from Earth?"}, {"role": "assistant", "content": "Around 384,400 kilometers. Give or take a few, like that really matters."}]}
+{"messages": [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
+{"messages": [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
 ```
 
-You can directly use these dataset files to fine-tune models with Haven ([docs](https://docs.haven.run/finetuning-quickstart)) or OpenAI ([docs](https://platform.openai.com/docs/guides/fine-tuning)). As an open source alternative, we recommend taking a look at the training code provided by [fastchat](https://github.com/lm-sys/FastChat/blob/main/docs/training.md).
+This format is compatible with:
+- OpenAI fine-tuning API
+- Most open-source training frameworks
+- Popular training libraries like FastChat
 
+## Environment Variables
 
+- `OPENAI_API_KEY` - For OpenAI/Azure OpenAI
+- `OPENROUTER_API_KEY` - For OpenRouter
 
+## License
 
+MIT License - see LICENSE file for details.
