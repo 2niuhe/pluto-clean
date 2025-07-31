@@ -1,4 +1,4 @@
-SAMPLE_GENERATION_PROMPT ="""I want to train a large language model and you should help me generate training data for it. Here is the system prompt of the model that tells it what it should be able to do:
+SAMPLE_GENERATION_PROMPT = """I want to train a large language model and you should help me generate training data for it. Here is the system prompt of the model that tells it what it should be able to do:
 
 <system_prompt>
 {{{{system_prompt}}}}
@@ -24,7 +24,6 @@ You should now generate three training samples for the model. A training sample 
 {{{{subtopics}}}}
 
 Now write a training sample and return it as a json, as seen above."""
-
 
 
 TREE_GENERATION_PROMPT = """I want to train a large language model and I am using another, bigger large language model to generate training data for this. However, if we always ask the bigger model to generate training data with the same prompt, it will end up generating very repetitive training samples. Therefore, we will slightly modify our prompt for each sampling procedure according to some aspects. For instance, when asking the model to generate news articles, we could modify the prompt to let the model tell news articles about particular topics, such as business or politics. To further generate training data, we will do this recursively, and generate submodifications to the prompt. For instance, within the domain of business, we could adapt the prompt to generate news about the stock market or business scandals, and within politics, we could ask the model to generate articles for subtopics like elections or climate policy. We do this recursively, and therefore, we get a tree-like structure of topics.

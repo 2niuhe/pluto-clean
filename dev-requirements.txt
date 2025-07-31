@@ -1,0 +1,10 @@
+-r requirements.txt
+
+ruff
+pytest
+flake8
+pytest-cov
+build
+twine
+pre-commit
+mypy
