@@ -1,5 +1,7 @@
 # 🌌 Pluto-Clean: Synthetic Data Generation for LLM Fine-Tuning
 
+> 继承自 [redotvideo/pluto](https://github.com/redotvideo/pluto) 项目
+
 A lightweight library for generating high-quality synthetic datasets for LLM fine-tuning with multi-provider API support.
 
 ## Features
