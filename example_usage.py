@@ -23,7 +23,7 @@ def example_ollama_usage():
 
     # 使用 Ollama
     try:
-        dataset = engine.create_data(
+        engine.create_data(
             model_name="llama3.1",
             num_steps=2,
             batch_size=5,
@@ -46,7 +46,7 @@ def example_openai_compatible_usage():
     engine = DataEngine(args)
 
     try:
-        dataset = engine.create_data(
+        engine.create_data(
             model_name="gpt-3.5-turbo",  # 这将被转换为 openai/gpt-3.5-turbo
             num_steps=2,
             batch_size=3,
@@ -72,7 +72,7 @@ def example_openrouter_usage():
 
     # 方式1：通过参数传递 API key
     try:
-        dataset1 = engine.create_data(
+        engine.create_data(
             model_name="anthropic/claude-3.5-sonnet",  # 这将被转换为 openrouter/anthropic/claude-3.5-sonnet
             num_steps=2,
             batch_size=3,
@@ -86,7 +86,7 @@ def example_openrouter_usage():
     # 方式2：通过环境变量（推荐）
     # 在运行前设置: export OPENROUTER_API_KEY=your-key
     try:
-        dataset2 = engine.create_data(
+        engine.create_data(
             model_name="anthropic/claude-3.5-sonnet",
             num_steps=2,
             batch_size=3,

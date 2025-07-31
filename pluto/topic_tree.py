@@ -1,7 +1,6 @@
 import litellm
 import json
 from dataclasses import dataclass
-import uuid
 import os
 from typing import List, Optional
 from .utils import extract_list
@@ -27,7 +26,6 @@ class TopicTree:
         self.tree_paths = []
 
     def build_tree(self, model_name: str = "gpt-3.5-turbo-1106"):
-        build_id = uuid.uuid4()
         self.tree_paths = self.build_subtree(
             model_name,
             [self.args.root_prompt],

@@ -4,7 +4,6 @@ from tqdm import tqdm
 import random
 import json
 import math
-import uuid
 from dataclasses import dataclass
 from .prompts import SAMPLE_GENERATION_PROMPT
 from .topic_tree import TopicTree
@@ -35,7 +34,6 @@ class DataEngine:
         api_base: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
-        creation_id = uuid.uuid4()
         data_creation_prompt = SAMPLE_GENERATION_PROMPT
 
         # 根据 API 提供商配置模型名称和参数
