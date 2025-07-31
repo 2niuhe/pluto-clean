@@ -2,13 +2,13 @@ from setuptools import setup, find_packages
 
 setup(
     name="pluto-clean",
-    version="1.0.0",
+    version="0.1.0",
     description="Generate synthetic data for LLM fine-tuning with multi-provider support",
     packages=find_packages(),
     include_package_data=True,
     install_requires=["litellm>=1.74.0"],
     python_requires=">=3.7",
-    author="Your Name",
+    author="Carlton",
     license="MIT",
     classifiers=[
         "Development Status :: 4 - Beta",
